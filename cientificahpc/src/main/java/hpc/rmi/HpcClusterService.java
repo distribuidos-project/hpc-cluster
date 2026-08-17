@@ -62,4 +62,30 @@ public interface HpcClusterService extends Remote {
      *         (the client should check getStatus first)
      */
     String getResult(String jobId) throws RemoteException;
+
+    /**
+     * Retrieves the error details of a FAILED job (compilation error,
+     * non-zero mpirun exit code, or a timeout caused by an unreachable
+     * node — see JobExecutionLoop).
+     *
+     * @param jobId the id returned by submitJob
+     * @return the failure details, or null if the job did not fail
+     *         (the client should check getStatus first)
+     */
+    String getErrorMessage(String jobId) throws RemoteException;
+
+    /**
+     * Re-authenticates the caller and re-submits a FAILED job from
+     * scratch (same job id, reset to QUEUED). Per the project's decision,
+     * there is no attempt to resume a partially completed MPI execution —
+     * a retry always restarts the whole job.
+     *
+     * @param username   the username
+     * @param credential the password (or token, depending on what is decided later)
+     * @param jobId      the id of the FAILED job to retry
+     * @throws AuthenticationException if the credentials are invalid
+     * @throws RemoteException         for RMI communication issues
+     */
+    void retryJob(String username, String credential, String jobId)
+            throws RemoteException, AuthenticationException;
 }

@@ -12,11 +12,14 @@ public interface JobQueue {
     /**
      * Adds a new job to the end of the queue.
      *
-     * @param owner      username of whoever submitted the job
-     * @param sourceCode the source code to compile and run
+     * @param owner         username of whoever submitted the job
+     * @param codeReference reference to the source code to compile and run
+     *                      (resolved later by HomeFetcher, not raw content)
+     * @param dataReference reference to the input dataset for the job
+     *                      (resolved later by HomeFetcher, not raw content)
      * @return the generated job id, used later to check status/result
      */
-    String enqueue(String owner, String sourceCode);
+    String enqueue(String owner, String codeReference, String dataReference);
 
     /**
      * Retrieves a job by id (its current status, result or error message).

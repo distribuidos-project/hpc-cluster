@@ -11,7 +11,7 @@ package hpc.home;
  * Left here as a placeholder so the rest of the system already has a
  * clear extension point to plug into once that decision is made.
  */
-public class RealHomeFetcher implements HomeFetcher {
+public class RepositoryHomeFetcher implements HomeFetcher {
 
     @Override
     public String resolve(String reference, String workingDirectory) {

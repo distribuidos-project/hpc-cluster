@@ -50,11 +50,11 @@ classDiagram
     class TestHomeFetcher {
         +resolve(reference) String
     }
-    class RealHomeFetcher {
+    class RepositoryHomeFetcher {
         +resolve(reference) String
     }
     HomeFetcher <|.. TestHomeFetcher : implementa
-    HomeFetcher <|.. RealHomeFetcher : implementa
+    HomeFetcher <|.. RepositoryHomeFetcher : implementa
 
     %% ===== hpc.cluster =====
     class NodeRegistry {
@@ -150,21 +150,31 @@ classDiagram
     HpcClusterService <|.. RmiClusterServer : implementa
     HpcClusterService ..> AuthenticationException : lanza
 
-    %% ===== El orquestador usa todo lo demás =====
+    %% ===== hpc.worker (nuevo) =====
+    class JobExecutionLoop {
+        <<Runnable>>
+        +run()
+        +stop()
+    }
+
+    %% ===== Quien usa que =====
     RmiClusterServer --> AuthProvider : usa
-    RmiClusterServer --> HomeFetcher : usa
-    RmiClusterServer --> LanguageRunner : usa
-    RmiClusterServer --> JobQueue : usa
-    RmiClusterServer --> NodeRegistry : usa
+    RmiClusterServer --> JobQueue : usa (enqueue/consulta)
+    JobExecutionLoop --> JobQueue : usa (pollNext/mark)
+    JobExecutionLoop --> HomeFetcher : usa
+    JobExecutionLoop --> LanguageRunner : usa
+    JobExecutionLoop --> NodeRegistry : usa (solo lectura)
 ```
 
 **Ya implementado:** `AuthProvider`, `FakeAuthProvider`, `UserInfo`, `LanguageRunner`, `CompilationResult`, `NodeRegistry`, `NodeInfo`, `NodeType`, `NodeStatus`, `JobQueue`, `Job`, `JobStatus`, `HpcClusterService`, `AuthenticationException`.
 
-**Pendiente de construir:** `CRunner`, `HomeFetcher` (y sus dos implementaciones), `InMemoryNodeRegistry`, `InMemoryJobQueue`, `RmiClusterServer`.
+**Pendiente de construir:** manejo de fallo de nodo + reintento automático desde `JobExecutionLoop` (tarea siguiente), y la clase `Main`/bootstrap que arranca todo (registra nodos, crea el hilo del loop, publica `RmiClusterServer` en el Registry).
+
+**Ya implementado (actualización):** `HomeFetcher`, `TestHomeFetcher`, `RepositoryHomeFetcher`, `RmiClusterServer`, `InMemoryJobQueue`, `InMemoryNodeRegistry`, `CRunner`, y una pieza nueva no contemplada en el diagrama original: **`JobExecutionLoop`** (paquete `hpc.worker`) — el hilo en segundo plano que de verdad ejecuta los jobs (`pollNext()` → `HomeFetcher.resolve()` → `LanguageRunner.compile()`/`execute()` → `markCompleted`/`markFailed`). `RmiClusterServer` solo encola y responde consultas; nunca compila ni ejecuta nada él mismo, por eso hacía falta este componente aparte.
 
 ## Cómo leer el diagrama
 
 - **`RmiClusterServer`** es el corazón del orquestador: implementa `HpcClusterService` (lo que el cliente invoca por RMI) y por dentro usa las otras cuatro piezas (`AuthProvider`, `HomeFetcher`, `LanguageRunner`, `JobQueue`, `NodeRegistry`) — nunca conoce sus implementaciones concretas, solo las interfaces.
-- **`HomeFetcher`** tendría dos implementaciones intercambiables: `TestHomeFetcher` (para pruebas, sin depender del Home real) y `RealHomeFetcher` (cuando esté lista la integración con el compañero del Home).
+- **`HomeFetcher`** tiene dos implementaciones intercambiables: `TestHomeFetcher` (para pruebas, sin depender del Home real) y `RepositoryHomeFetcher` (cuando esté lista la integración con el compañero del Home).
 - Los `enum` (`NodeType`, `NodeStatus`, `JobStatus`) y las clases de datos (`UserInfo`, `NodeInfo`, `Job`, `CompilationResult`) son las que viajan entre las piezas, cargando la información necesaria sin acoplar unas implementaciones a otras.
-- Todo lo que sigue en amarillo (`CRunner`, `HomeFetcher` y sus dos implementaciones, las versiones en memoria de `NodeRegistry`/`JobQueue`, y `RmiClusterServer`) es lo que falta por construir en las tareas siguientes.
+- Todo lo que sigue en amarillo (`CRunner`, las versiones en memoria de `NodeRegistry`/`JobQueue`, y `RmiClusterServer`) es lo que falta por construir en las tareas siguientes.
