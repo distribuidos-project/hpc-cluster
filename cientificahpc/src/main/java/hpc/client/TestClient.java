@@ -13,10 +13,16 @@ import hpc.rmi.HpcClusterService;
  * result or error. Also supports checking status and retrying an existing
  * job, useful for testing the node-failure scenario.
  *
+ * Now that Main wires the real JwtAuthProvider, the credential is a real
+ * RS256 JWT issued by cca-soap (its "autenticar" SOAP operation), not a
+ * hardcoded test password — obtain one by calling cca-soap and paste it
+ * in, or wire it up through whatever client cca-web/cca-soap already
+ * expose.
+ *
  * Usage (run from any machine that can reach the master on port 1099):
- *   java -cp target/classes hpc.client.TestClient <masterHost> submit <codeReference> <dataReference>
- *   java -cp target/classes hpc.client.TestClient <masterHost> status <jobId>
- *   java -cp target/classes hpc.client.TestClient <masterHost> retry <jobId>
+ *   java -cp target/classes hpc.client.TestClient <masterHost> <username> <jwtToken> submit <codeReference> <dataReference>
+ *   java -cp target/classes hpc.client.TestClient <masterHost> <username> <jwtToken> status <jobId>
+ *   java -cp target/classes hpc.client.TestClient <masterHost> <username> <jwtToken> retry <jobId>
  */
 public class TestClient {
 
@@ -24,47 +30,45 @@ public class TestClient {
     private static final String SERVICE_NAME = "HpcClusterService";
     private static final long POLL_INTERVAL_MS = 2000;
 
-    // Test user from FakeAuthProvider.
-    private static final String USERNAME = "juan";
-    private static final String CREDENTIAL = "1234";
-
     public static void main(String[] args) throws Exception {
-        if (args.length < 2) {
+        if (args.length < 4) {
             printUsage();
             return;
         }
 
         String masterHost = args[0];
-        String command = args[1];
+        String username = args[1];
+        String token = args[2];
+        String command = args[3];
 
         Registry registry = LocateRegistry.getRegistry(masterHost, RMI_PORT);
         HpcClusterService cluster = (HpcClusterService) registry.lookup(SERVICE_NAME);
 
         switch (command) {
             case "submit" -> {
-                if (args.length < 4) {
+                if (args.length < 6) {
                     printUsage();
                     return;
                 }
-                String jobId = cluster.submitJob(USERNAME, CREDENTIAL, args[2], args[3]);
+                String jobId = cluster.submitJob(username, token, args[4], args[5]);
                 System.out.println("Job submitted: " + jobId);
                 waitAndPrint(cluster, jobId);
             }
             case "status" -> {
-                if (args.length < 3) {
+                if (args.length < 5) {
                     printUsage();
                     return;
                 }
-                waitAndPrint(cluster, args[2]);
+                waitAndPrint(cluster, args[4]);
             }
             case "retry" -> {
-                if (args.length < 3) {
+                if (args.length < 5) {
                     printUsage();
                     return;
                 }
-                cluster.retryJob(USERNAME, CREDENTIAL, args[2]);
-                System.out.println("Retry requested for job " + args[2]);
-                waitAndPrint(cluster, args[2]);
+                cluster.retryJob(username, token, args[4]);
+                System.out.println("Retry requested for job " + args[4]);
+                waitAndPrint(cluster, args[4]);
             }
             default -> printUsage();
         }
@@ -90,8 +94,8 @@ public class TestClient {
 
     private static void printUsage() {
         System.out.println("Usage:");
-        System.out.println("  submit: TestClient <masterHost> submit <codeReference> <dataReference>");
-        System.out.println("  status: TestClient <masterHost> status <jobId>");
-        System.out.println("  retry:  TestClient <masterHost> retry <jobId>");
+        System.out.println("  submit: TestClient <masterHost> <username> <jwtToken> submit <codeReference> <dataReference>");
+        System.out.println("  status: TestClient <masterHost> <username> <jwtToken> status <jobId>");
+        System.out.println("  retry:  TestClient <masterHost> <username> <jwtToken> retry <jobId>");
     }
 }

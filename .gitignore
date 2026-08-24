@@ -1,0 +1,6 @@
+# Key material: public or private, none of it belongs in git history.
+# JwtAuthProvider loads cca-soap's public key from cientificahpc/keys/
+# at runtime (see hpc/auth/JwtAuthProvider.java) -- each checkout/deploy
+# is expected to drop its own copy there instead of committing it.
+*.pem
+*.key
