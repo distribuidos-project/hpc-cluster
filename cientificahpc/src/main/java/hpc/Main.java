@@ -14,6 +14,7 @@ import hpc.home.HomeFetcher;
 import hpc.home.HomePublisher;
 import hpc.home.RepositoryHomeFetcher;
 import hpc.home.RepositoryHomePublisher;
+import hpc.http.HttpBridge;
 import hpc.jobs.InMemoryJobQueue;
 import hpc.jobs.JobQueue;
 import hpc.rmi.RmiClusterServer;
@@ -51,6 +52,14 @@ public class Main {
     private static final int RMI_PORT = 1099;
     private static final String SERVICE_NAME = "HpcClusterService";
 
+    // Puente HTTP para cca-web. Un navegador no puede hablar RMI, asi que
+    // sin esto la interfaz web no puede usar el cluster por muy bien
+    // configurada que este la red. Se puede mover de puerto o restringir
+    // el origen sin recompilar:
+    //   -Dhpc.http.port=8080  -Dhpc.http.origin=http://cca-web
+    private static final String HTTP_PORT_PROPERTY = "hpc.http.port";
+    private static final String HTTP_ORIGIN_PROPERTY = "hpc.http.origin";
+
     public static void main(String[] args) throws Exception {
         AuthProvider authProvider = new JwtAuthProvider();
         HomeFetcher homeFetcher = new RepositoryHomeFetcher();
@@ -69,6 +78,15 @@ public class Main {
         RmiClusterServer server = new RmiClusterServer(authProvider, jobQueue);
         Registry registry = LocateRegistry.createRegistry(RMI_PORT);
         registry.rebind(SERVICE_NAME, server);
+
+        // El puente recibe ESTE MISMO objeto, no un stub remoto: corre en
+        // el mismo JVM, asi que sus llamadas no salen a la red. Por eso no
+        // le afecta el segundo puerto aleatorio que RMI abre para el
+        // objeto remoto, que es el problema tipico tras un cortafuegos.
+        int httpPort = Integer.getInteger(HTTP_PORT_PROPERTY, HttpBridge.DEFAULT_PORT);
+        String httpOrigin = System.getProperty(HTTP_ORIGIN_PROPERTY, HttpBridge.DEFAULT_ORIGIN);
+        HttpBridge httpBridge = new HttpBridge(server, httpPort, httpOrigin);
+        httpBridge.start();
 
         System.out.println("HPC cluster server ready on port " + RMI_PORT + " as '" + SERVICE_NAME + "'.");
         System.out.println("Registered nodes: " + nodeRegistry.listAvailableNodes());
